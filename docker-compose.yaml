@@ -1,0 +1,106 @@
+version: '2'
+services:
+  mssql:
+    container_name: cdc-sqlserver
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    ports:
+      - 1433:1433
+    environment:
+      ACCEPT_EULA: 'Y'
+      SA_PASSWORD: '1q2w3e4r$'
+      MSSQL_AGENT_ENABLED: True
+  mssql-init:
+    container_name: cdc-mssql-init
+    image: mcr.microsoft.com/mssql-tools
+    command: /opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P 1q2w3e4r$ -i /scripts/init.sql
+    volumes:
+      - ./scripts/init.sql:/scripts/init.sql
+    depends_on:
+      - mssql
+  zookeeper:
+    container_name: cdc-zookeeper
+    image: confluentinc/cp-zookeeper:latest
+    ports:
+      - 2181:2181
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+  kafka:
+    container_name: cdc-kafka
+    image: confluentinc/cp-kafka:7.7.0
+    ports:
+      - 9092:9092
+      - 9093:9093
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      ALLOW_PLAINTEXT_LISTENER: YES
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+  kafka-init:
+    container_name: cdc-kafka-init
+    image: confluentinc/cp-kafka:7.7.0
+    entrypoint: ['/bin/sh', '-c']
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    command: |
+      "
+        kafka-topics --create --if-not-exists --topic Employee --replication-factor 1 --partitions 1 --bootstrap-server kafka:9092
+      "
+    depends_on:
+      - kafka
+    restart:
+      on-failure
+  kafka-ui:
+    container_name: cdc-kafka-ui
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8085:8080
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+      - zookeeper
+  connect:
+    container_name: cdc-sqlserver-connect
+    image: quay.io/debezium/connect:nightly
+    ports:
+      - 8083:8083
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: CONNECT_CONFIGS
+      OFFSET_STORAGE_TOPIC: CONNECT_OFFSETS
+      STATUS_STORAGE_TOPIC: CONNECT_STATUSES
+    restart:
+      on-failure
+    depends_on:
+      - kafka
+      - mssql
+  connect-ui:
+    container_name: cdc-sqlserver-connect-ui
+    image: quay.io/debezium/debezium-ui:latest
+    ports:
+      - 8080:8080
+    environment:
+      KAFKA_CONNECT_URIS: http://connect:8083
+    depends_on:
+      - connect
+  connect-init:
+    container_name: cdc-sqlserver-connect-init
+    image: curlimages/curl:8.9.1
+    command: ["/bin/sh", "/scripts/connect-debezium.sh"]
+    volumes:
+      - ./scripts/connect-debezium.sh:/scripts/connect-debezium.sh
+    restart:
+      on-failure
+    depends_on:
+      - connect
+      - mssql
+      - kafka
