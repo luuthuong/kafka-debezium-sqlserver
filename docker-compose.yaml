@@ -92,15 +92,15 @@ services:
       KAFKA_CONNECT_URIS: http://connect:8083
     depends_on:
       - connect
-  connect-init:
-    container_name: cdc-sqlserver-connect-init
-    image: curlimages/curl:8.9.1
-    command: ["/bin/sh", "/scripts/connect-debezium.sh"]
-    volumes:
-      - ./scripts/connect-debezium.sh:/scripts/connect-debezium.sh
-    restart:
-      on-failure
-    depends_on:
-      - connect
-      - mssql
-      - kafka
+  # connect-init:
+  #   container_name: cdc-sqlserver-connect-init
+  #   image: curlimages/curl:8.9.1
+  #   command: ["/bin/sh", "/scripts/connect-debezium.sh"]
+  #   volumes:
+  #     - ./scripts/connect-debezium.sh:/scripts/connect-debezium.sh
+  #   restart:
+  #     on-failure
+  #   depends_on:
+  #     - connect
+  #     - mssql
+  #     - kafka

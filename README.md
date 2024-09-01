@@ -2,8 +2,18 @@
 
 This repository contains a sample project that demonstrates how to use Debezium to capture change data from a SQL Server database and stream it to Kafka.
 
-## How to run
+## Workflow
+![Workflow Event outbox with Debezium and Kafka](image.png)
+The project follows this general workflow:
+1. SQL Server generates change data capture (CDC) events for modifications to the Employee table.
+2. Debezium SQL Server connector reads the CDC events from SQL Server.
+3. The connector transforms these events into Kafka Connect format.
+4. The transformed events are written to a Kafka topic named "Employee".
+5. Consumers can then read from this Kafka topic to process the change events.
 
+This setup allows for real-time tracking and processing of data changes in the SQL Server database.
+
+## How to run
 To run the project, execute the following command:
 
 ```sh
